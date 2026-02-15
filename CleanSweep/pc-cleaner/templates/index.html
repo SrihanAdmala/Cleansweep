@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CleanSweep — Open Source PC Cleaner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0c0f;
+      --bg2:       #0f1217;
+      --bg3:       #151a22;
+      --border:    #1e2530;
+      --border2:   #2a3445;
+      --green:     #00e5a0;
+      --green-dim: #007a55;
+      --cyan:      #00c8e0;
+      --yellow:    #f0c040;
+      --red:       #ff4d6a;
+      --text:      #c8d6e8;
+      --text-dim:  #5a6a7e;
+      --text-bright: #e8f0ff;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* GRID NOISE BACKGROUND */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,229,160,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,0.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ─── HEADER ─── */
+    header {
+      position: relative; z-index: 10;
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: linear-gradient(180deg, #0c1118 0%, transparent 100%);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 14px;
+    }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 100%);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; animation: pulse-icon 3s ease-in-out infinite;
+    }
+    @keyframes pulse-icon {
+      0%, 100% { filter: drop-shadow(0 0 8px var(--green)); }
+      50% { filter: drop-shadow(0 0 16px var(--green)); }
+    }
+    .logo-text { line-height: 1; }
+    .logo-name {
+      font-size: 22px; font-weight: 700; letter-spacing: 3px;
+      color: var(--text-bright);
+      text-shadow: 0 0 20px rgba(0,229,160,0.4);
+    }
+    .logo-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; color: var(--green); letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .header-status {
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px; color: var(--text-dim);
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: blink 2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ─── LAYOUT ─── */
+    .container {
+      position: relative; z-index: 1;
+      max-width: 1300px; margin: 0 auto;
+      padding: 28px 32px;
+    }
+
+    /* ─── NAV TABS ─── */
+    .tabs {
+      display: flex; gap: 2px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .tab {
+      padding: 10px 24px; cursor: pointer;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px; font-weight: 600; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text-dim);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s; user-select: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+    /* ─── PANELS ─── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ─── METRIC CARDS ─── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px; margin-bottom: 28px;
+    }
+    @media (max-width: 900px) { .metrics-grid { grid-template-columns: repeat(2,1fr); } }
+
+    .metric-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px; padding: 20px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .metric-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--green-dim), transparent);
+    }
+    .metric-card:hover { border-color: var(--border2); }
+    .metric-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 2px;
+      color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px;
+    }
+    .metric-value {
+      font-size: 26px; font-weight: 700; color: var(--text-bright);
+      letter-spacing: 1px; line-height: 1;
+    }
+    .metric-sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+    .metric-bar {
+      height: 3px; background: var(--border); border-radius: 2px;
+      margin-top: 12px; overflow: hidden;
+    }
+    .metric-bar-fill {
+      height: 100%; border-radius: 2px; transition: width 1s ease;
+    }
+    .bar-green  { background: linear-gradient(90deg, var(--green-dim), var(--green)); }
+    .bar-yellow { background: linear-gradient(90deg, #7a6020, var(--yellow)); }
+    .bar-red    { background: linear-gradient(90deg, #7a2030, var(--red)); }
+    .bar-cyan   { background: linear-gradient(90deg, #006070, var(--cyan)); }
+
+    /* ─── TWO-COL CONTENT ─── */
+    .content-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
+
+    /* ─── CARD ─── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px; overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg3);
+    }
+    .card-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px; letter-spacing: 2px;
+      color: var(--green); text-transform: uppercase;
+    }
+    .card-body { padding: 16px 20px; max-height: 340px; overflow-y: auto; }
+    .card-body::-webkit-scrollbar { width: 4px; }
+    .card-body::-webkit-scrollbar-track { background: var(--bg2); }
+    .card-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ─── JUNK ROWS ─── */
+    .junk-row {
+      display: flex; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      gap: 12px; font-size: 14px;
+    }
+    .junk-row:last-child { border-bottom: none; }
+    .junk-name { flex: 1; color: var(--text); font-weight: 500; }
+    .junk-size {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--yellow); min-width: 80px; text-align: right;
+    }
+    .junk-bar-wrap { width: 80px; height: 4px; background: var(--border); border-radius: 2px; }
+    .junk-bar { height: 100%; background: var(--yellow); border-radius: 2px; transition: width 0.6s; }
+
+    /* ─── BIG ACTION BUTTON ─── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 36px; cursor: pointer;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 16px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, var(--green-dim) 0%, #005540 100%);
+      color: var(--green); border: 1px solid var(--green);
+      border-radius: 3px; transition: all 0.2s; user-select: none;
+      box-shadow: 0 0 20px rgba(0,229,160,0.1), inset 0 1px 0 rgba(0,229,160,0.1);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #007a55 0%, var(--green-dim) 100%);
+      box-shadow: 0 0 30px rgba(0,229,160,0.25);
+    }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 24px; cursor: pointer;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px; font-weight: 600; letter-spacing: 2px;
+      text-transform: uppercase;
+      background: transparent;
+      color: var(--text-dim); border: 1px solid var(--border2);
+      border-radius: 3px; transition: all 0.2s; user-select: none;
+    }
+    .btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+
+    /* ─── SCAN/CLEAN AREA ─── */
+    .action-area {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 32px;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 24px; margin-bottom: 28px;
+    }
+    .scan-result-hero {
+      text-align: center;
+    }
+    .scan-bytes-big {
+      font-size: 64px; font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--yellow);
+      text-shadow: 0 0 30px rgba(240,192,64,0.4);
+      letter-spacing: -2px; line-height: 1;
+    }
+    .scan-bytes-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px; letter-spacing: 3px;
+      color: var(--text-dim); text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    .btn-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+    /* ─── PROGRESS LOG ─── */
+    .progress-log {
+      width: 100%; max-height: 280px; overflow-y: auto;
+      background: #060a0e; border: 1px solid var(--border);
+      border-radius: 3px; padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; line-height: 1.8;
+    }
+    .progress-log::-webkit-scrollbar { width: 4px; }
+    .progress-log::-webkit-scrollbar-thumb { background: var(--border2); }
+    .log-line { display: flex; gap: 12px; }
+    .log-time { color: var(--text-dim); min-width: 80px; }
+    .log-cat { color: var(--cyan); flex: 1; }
+    .log-freed { color: var(--green); min-width: 90px; text-align: right; }
+    .log-error { color: var(--red); }
+    .log-done { color: var(--green); font-weight: 700; font-size: 13px; }
+
+    /* ─── SPINNERS ─── */
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid var(--border2);
+      border-top-color: var(--green); border-radius: 50%;
+      animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── LARGE FILE LIST ─── */
+    .large-file-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .large-file-row:last-child { border-bottom: none; }
+    .large-file-path {
+      flex: 1; color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .large-file-size {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--red); min-width: 80px; text-align: right;
+    }
+
+    /* ─── STARTUP TABLE ─── */
+    .startup-row {
+      display: flex; gap: 12px; padding: 8px 0;
+      border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .startup-row:last-child { border-bottom: none; }
+    .startup-name { color: var(--text-bright); font-weight: 600; min-width: 160px; }
+    .startup-val { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ─── BADGE ─── */
+    .badge {
+      padding: 2px 8px; border-radius: 2px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .badge-green { background: rgba(0,229,160,0.1); color: var(--green); border: 1px solid rgba(0,229,160,0.3); }
+    .badge-yellow { background: rgba(240,192,64,0.1); color: var(--yellow); border: 1px solid rgba(240,192,64,0.3); }
+    .badge-red { background: rgba(255,77,106,0.1); color: var(--red); border: 1px solid rgba(255,77,106,0.3); }
+
+    /* ─── OPTIMIZE ─── */
+    .opt-result {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .opt-result:last-child { border-bottom: none; }
+    .opt-icon { font-size: 18px; }
+    .opt-task { flex: 1; font-size: 14px; font-weight: 500; }
+    .opt-status-done { color: var(--green); font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+    .opt-status-fail { color: var(--red); font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+
+    /* ─── TOAST ─── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      padding: 14px 24px; border-radius: 3px;
+      font-size: 14px; font-weight: 600;
+      background: var(--bg3); border: 1px solid var(--green);
+      color: var(--green); z-index: 9999;
+      opacity: 0; transform: translateY(10px);
+      transition: all 0.3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ─── EMPTY STATE ─── */
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace; font-size: 13px; letter-spacing: 1px;
+    }
+
+    /* ─── DIVIDER ─── */
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    /* ─── SCAN ANIMATION ─── */
+    .scan-sweep {
+      width: 100%; max-width: 400px; height: 4px;
+      background: var(--border); border-radius: 2px; overflow: hidden;
+    }
+    .scan-sweep-fill {
+      height: 100%; width: 30%;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      animation: sweep 1.5s ease-in-out infinite;
+    }
+    @keyframes sweep {
+      0% { transform: translateX(-150%); }
+      100% { transform: translateX(480%); }
+    }
+
+    h2 {
+      font-size: 20px; font-weight: 700; letter-spacing: 2px;
+      color: var(--text-bright); margin-bottom: 6px;
+    }
+    p.desc { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧹</div>
+    <div class="logo-text">
+      <div class="logo-name">CLEANSWEEP</div>
+      <div class="logo-tag">Open Source PC Optimizer</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot"></div>
+    <span id="status-text">SYSTEM ONLINE</span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('dashboard')">Dashboard</div>
+    <div class="tab" onclick="switchTab('cleaner')">Junk Cleaner</div>
+    <div class="tab" onclick="switchTab('optimizer')">Optimizer</div>
+    <div class="tab" onclick="switchTab('startup')">Startup & Large Files</div>
+  </div>
+
+  <!-- ───────── DASHBOARD ───────── -->
+  <div id="tab-dashboard" class="panel active">
+    <div class="metrics-grid" id="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">CPU Usage</div>
+        <div class="metric-value" id="m-cpu">—</div>
+        <div class="metric-sub">Loading...</div>
+        <div class="metric-bar"><div class="metric-bar-fill bar-green" id="bar-cpu" style="width:0%"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">RAM Usage</div>
+        <div class="metric-value" id="m-ram">—</div>
+        <div class="metric-sub" id="m-ram-sub">Loading...</div>
+        <div class="metric-bar"><div class="metric-bar-fill bar-cyan" id="bar-ram" style="width:0%"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Disk Used</div>
+        <div class="metric-value" id="m-disk">—</div>
+        <div class="metric-sub" id="m-disk-sub">Loading...</div>
+        <div class="metric-bar"><div class="metric-bar-fill bar-yellow" id="bar-disk" style="width:0%"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Disk Free</div>
+        <div class="metric-value" id="m-free">—</div>
+        <div class="metric-sub" id="m-os">Loading...</div>
+        <div class="metric-bar"><div class="metric-bar-fill bar-green" id="bar-free" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">System Info</span>
+          <button class="btn-secondary" onclick="loadSysInfo()">↻ Refresh</button>
+        </div>
+        <div class="card-body" id="sysinfo-body">
+          <div class="empty-state">Loading system information...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Quick Actions</span>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn-primary" style="width:100%;justify-content:center" onclick="switchTab('cleaner'); runScan()">
+              🔍 Scan for Junk Files
+            </button>
+            <button class="btn-secondary" style="width:100%;justify-content:center" onclick="switchTab('optimizer'); runOptimize()">
+              ⚡ Run System Optimizations
+            </button>
+            <button class="btn-secondary" style="width:100%;justify-content:center" onclick="switchTab('startup')">
+              📋 View Startup Programs
+            </button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);line-height:2;">
+            <div>✔ Cleans temp files, caches & logs</div>
+            <div>✔ Browser cache (Chrome, Firefox, Edge)</div>
+            <div>✔ Windows/macOS/Linux support</div>
+            <div>✔ DNS flush &amp; network reset</div>
+            <div>✔ Startup item inspector</div>
+            <div>✔ Large file scanner</div>
+            <div>✔ 100% open source (MIT License)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── JUNK CLEANER ───────── -->
+  <div id="tab-cleaner" class="panel">
+    <div class="action-area">
+      <div class="scan-result-hero" id="scan-hero">
+        <div class="scan-bytes-big" id="scan-total">?</div>
+        <div class="scan-bytes-label" id="scan-label">Run a scan to detect junk</div>
+      </div>
+      <div class="scan-sweep" id="scan-sweep" style="display:none">
+        <div class="scan-sweep-fill"></div>
+      </div>
+      <div class="btn-group">
+        <button class="btn-primary" id="btn-scan" onclick="runScan()">🔍 SCAN SYSTEM</button>
+        <button class="btn-primary" id="btn-clean" style="display:none" onclick="runClean()">
+          🧹 CLEAN ALL JUNK
+        </button>
+        <button class="btn-secondary" id="btn-rescan" style="display:none" onclick="runScan()">↻ Rescan</button>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Junk Categories Found</span>
+          <span class="badge badge-yellow" id="scan-count-badge">0 found</span>
+        </div>
+        <div class="card-body" id="junk-list">
+          <div class="empty-state">Run a scan first</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Clean Log</span>
+          <button class="btn-secondary" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="progress-log" id="clean-log">
+          <div style="color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:12px;">
+            Waiting for clean operation...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── OPTIMIZER ───────── -->
+  <div id="tab-optimizer" class="panel">
+    <div style="margin-bottom:24px;">
+      <h2>System Optimizer</h2>
+      <p class="desc">Run system-level optimizations: flush DNS, refresh network, purge caches, and more.</p>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Run Optimizations</span>
+        </div>
+        <div class="card-body">
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:20px;line-height:1.7;">
+            These optimizations are safe and non-destructive. They refresh system caches
+            and release memory without deleting personal files.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);line-height:2.2;">
+            <div>⚡ Flush DNS Cache — clear stale name resolution</div>
+            <div>🔄 Refresh IP Configuration (Windows)</div>
+            <div>🗑️ Empty Recycle Bin (Windows)</div>
+            <div>💾 Purge Inactive Memory (macOS)</div>
+            <div>🔄 Sync Disk Buffers (Linux)</div>
+          </div>
+          <button class="btn-primary" id="btn-optimize" onclick="runOptimize()">
+            ⚡ RUN OPTIMIZATIONS
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Optimization Results</span>
+        </div>
+        <div class="card-body" id="opt-results">
+          <div class="empty-state">Run optimizations to see results</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── STARTUP & LARGE FILES ───────── -->
+  <div id="tab-startup" class="panel">
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Startup Programs</span>
+          <span class="badge badge-green" id="startup-count">—</span>
+        </div>
+        <div class="card-body" id="startup-list">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Large Files (&gt;50MB)</span>
+          <span class="badge badge-red" id="large-count">—</span>
+        </div>
+        <div class="card-body" id="large-files-list">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let scanData = null;
+
+// ─── Tab switching ───
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab')[['dashboard','cleaner','optimizer','startup'].indexOf(name)].classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ─── Toast ───
+function toast(msg, dur = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ─── Format bytes ───
+function fmtBytes(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(2) + ' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(1) + ' MB';
+  if (b >= 1e3) return (b/1e3).toFixed(0) + ' KB';
+  return b + ' B';
+}
+
+// ─── Load System Info (Dashboard + Startup/Large Files) ───
+async function loadSysInfo() {
+  try {
+    const res = await fetch('/api/sysinfo');
+    const d = await res.json();
+
+    // Metrics
+    document.getElementById('m-cpu').textContent = d.cpu_percent.toFixed(0) + '%';
+    document.getElementById('m-ram').textContent = d.ram_percent.toFixed(0) + '%';
+    document.getElementById('m-ram-sub').textContent = `${d.ram_used_human} / ${d.ram_total_human}`;
+    document.getElementById('m-disk').textContent = d.disk_percent.toFixed(0) + '%';
+    document.getElementById('m-disk-sub').textContent = `${d.disk_used_human} of ${d.disk_total_human}`;
+    document.getElementById('m-free').textContent = d.disk_free_human;
+    document.getElementById('m-os').textContent = d.os + ' detected';
+
+    // Color bars
+    const cpuBar = document.getElementById('bar-cpu');
+    cpuBar.style.width = d.cpu_percent + '%';
+    cpuBar.className = 'metric-bar-fill ' + (d.cpu_percent > 80 ? 'bar-red' : d.cpu_percent > 50 ? 'bar-yellow' : 'bar-green');
+    document.getElementById('bar-ram').style.width = d.ram_percent + '%';
+    document.getElementById('bar-disk').style.width = d.disk_percent + '%';
+    document.getElementById('bar-free').style.width = ((d.disk_free / d.disk_total) * 100) + '%';
+
+    // Sysinfo body
+    document.getElementById('sysinfo-body').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px;">
+        <div style="display:flex;gap:8px;"><span style="color:var(--text-dim);min-width:120px;">OS</span><span style="color:var(--text);">${d.os}</span></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--text-dim);min-width:120px;">CPU Cores</span><span style="color:var(--text);">${d.cpu_count}</span></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--text-dim);min-width:120px;">RAM Total</span><span style="color:var(--text);">${d.ram_total_human}</span></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--text-dim);min-width:120px;">Disk Total</span><span style="color:var(--text);">${d.disk_total_human}</span></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--text-dim);min-width:120px;">Disk Free</span><span style="color:${d.disk_percent > 90 ? 'var(--red)' : 'var(--green)'};">${d.disk_free_human}</span></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--text-dim);min-width:120px;">Startup Items</span><span style="color:var(--yellow);">${d.startup_items.length} found</span></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--text-dim);min-width:120px;">Large Files</span><span style="color:var(--red);">${d.large_files.length} found (>50MB)</span></div>
+      </div>
+    `;
+
+    // Startup list
+    const startupList = document.getElementById('startup-list');
+    document.getElementById('startup-count').textContent = d.startup_items.length + ' items';
+    if (d.startup_items.length === 0) {
+      startupList.innerHTML = `<div class="empty-state">No startup programs found<br>(Windows only feature)</div>`;
+    } else {
+      startupList.innerHTML = d.startup_items.map(s => `
+        <div class="startup-row">
+          <div class="startup-name">${s.name}</div>
+          <div class="startup-val">${s.value}</div>
+        </div>`).join('');
+    }
+
+    // Large files list
+    const largeList = document.getElementById('large-files-list');
+    document.getElementById('large-count').textContent = d.large_files.length + ' files';
+    if (d.large_files.length === 0) {
+      largeList.innerHTML = `<div class="empty-state">No large files found in home directory<br>(or scan still running)</div>`;
+    } else {
+      largeList.innerHTML = d.large_files.map(f => `
+        <div class="large-file-row">
+          <div class="large-file-path" title="${f.path}">${f.path}</div>
+          <div class="large-file-size">${f.size_human}</div>
+        </div>`).join('');
+    }
+
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ─── SCAN ───
+async function runScan() {
+  document.getElementById('btn-scan').disabled = true;
+  document.getElementById('btn-clean').style.display = 'none';
+  document.getElementById('btn-rescan').style.display = 'none';
+  document.getElementById('scan-sweep').style.display = 'block';
+  document.getElementById('scan-total').textContent = '…';
+  document.getElementById('scan-label').textContent = 'Scanning system...';
+  document.getElementById('junk-list').innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto 10px"></div>Scanning...</div>';
+
+  try {
+    const res = await fetch('/api/scan');
+    scanData = await res.json();
+
+    document.getElementById('scan-sweep').style.display = 'none';
+    document.getElementById('scan-total').textContent = scanData.total_human;
+    document.getElementById('scan-label').textContent = 'junk found on ' + scanData.os;
+    document.getElementById('scan-count-badge').textContent = scanData.categories.length + ' found';
+    document.getElementById('btn-scan').disabled = false;
+    document.getElementById('btn-clean').style.display = 'inline-flex';
+    document.getElementById('btn-rescan').style.display = 'inline-flex';
+
+    // Max size for bar scaling
+    const maxSize = scanData.categories.length ? scanData.categories[0].size : 1;
+    document.getElementById('junk-list').innerHTML = scanData.categories.map(c => `
+      <div class="junk-row">
+        <div class="junk-name">${c.category}</div>
+        <div class="junk-bar-wrap"><div class="junk-bar" style="width:${Math.round(c.size/maxSize*100)}%"></div></div>
+        <div class="junk-size">${c.size_human}</div>
+      </div>`).join('') || '<div class="empty-state">No junk found — your system is clean!</div>';
+
+    toast('✔ Scan complete: ' + scanData.total_human + ' found');
+  } catch(e) {
+    document.getElementById('scan-sweep').style.display = 'none';
+    document.getElementById('btn-scan').disabled = false;
+    document.getElementById('scan-label').textContent = 'Scan failed — is the backend running?';
+    toast('✖ Scan failed');
+  }
+}
+
+// ─── CLEAN ───
+function runClean() {
+  const btnClean = document.getElementById('btn-clean');
+  const btnScan = document.getElementById('btn-scan');
+  btnClean.disabled = true;
+  btnScan.disabled = true;
+
+  const log = document.getElementById('clean-log');
+  log.innerHTML = '';
+
+  const source = new EventSource('/api/clean');
+  let totalFreed = 0;
+
+  source.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+
+    if (data.done) {
+      source.close();
+      btnClean.disabled = false;
+      btnScan.disabled = false;
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.innerHTML = `<span class="log-done">✔ CLEAN COMPLETE — Freed ${data.total_freed_human} | ${data.errors} errors</span>`;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+
+      document.getElementById('scan-total').textContent = data.total_freed_human;
+      document.getElementById('scan-label').textContent = 'freed from ' + (scanData ? scanData.os : 'system');
+      document.getElementById('btn-clean').style.display = 'none';
+      toast('🧹 Cleaned ' + data.total_freed_human + '!', 5000);
+      loadSysInfo();
+      return;
+    }
+
+    totalFreed += data.freed;
+    const now = new Date();
+    const timeStr = now.toTimeString().slice(0,8);
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `
+      <span class="log-time">${timeStr}</span>
+      <span class="log-cat">${data.category}</span>
+      <span class="log-freed">${data.freed_human}</span>
+      ${data.errors > 0 ? `<span class="log-error">${data.errors} err</span>` : ''}
+    `;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  };
+
+  source.onerror = () => {
+    source.close();
+    btnClean.disabled = false;
+    btnScan.disabled = false;
+    toast('✖ Clean failed or completed');
+  };
+}
+
+// ─── OPTIMIZE ───
+async function runOptimize() {
+  document.getElementById('btn-optimize').disabled = true;
+  document.getElementById('opt-results').innerHTML = `
+    <div class="empty-state"><div class="spinner" style="margin:0 auto 10px"></div>Running optimizations...</div>`;
+
+  try {
+    const res = await fetch('/api/optimize');
+    const d = await res.json();
+
+    document.getElementById('opt-results').innerHTML = d.results.map(r => `
+      <div class="opt-result">
+        <span class="opt-icon">${r.status === 'done' || r.status === 'started' ? '✅' : '❌'}</span>
+        <span class="opt-task">${r.task}</span>
+        <span class="${r.status === 'done' || r.status === 'started' ? 'opt-status-done' : 'opt-status-fail'}">
+          ${r.status.toUpperCase()}
+        </span>
+      </div>`).join('') || '<div class="empty-state">No optimizations ran</div>';
+
+    toast('⚡ Optimizations complete');
+  } catch(e) {
+    document.getElementById('opt-results').innerHTML = '<div class="empty-state">Failed to run optimizations</div>';
+    toast('✖ Optimization failed');
+  }
+
+  document.getElementById('btn-optimize').disabled = false;
+}
+
+function clearLog() {
+  document.getElementById('clean-log').innerHTML =
+    '<div style="color:var(--text-dim);font-family:\'JetBrains Mono\',monospace;font-size:12px;">Log cleared</div>';
+}
+
+// Init
+loadSysInfo();
+</script>
+</body>
+</html>
